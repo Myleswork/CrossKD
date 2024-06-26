@@ -104,24 +104,29 @@ class CrossKDATSS(CrossKDSingleStageDetector):
     
     def reuse_teacher_head(self, tea_cls_feat, tea_reg_feat, stu_cls_feat,
                            stu_reg_feat, scale):
-        reused_cls_feat = self.align_scale(stu_cls_feat, tea_cls_feat)  #做一个维度处理
-        reused_reg_feat = self.align_scale(stu_reg_feat, tea_reg_feat)  #做一个维度处理
+        '''
+        Returns:
+        Student former idx-1 head feature, send to teacher latter head, detection results
+        那么这个函数在调用的时候的stu_cls_feat和stu_reg_feat应该就是上面的两个hold
+        '''
+        reused_cls_feat = self.align_scale(stu_cls_feat, tea_cls_feat)  #做一个维度处理，最后输出规范化好的stu_cls_fea
+        reused_reg_feat = self.align_scale(stu_reg_feat, tea_reg_feat)  #做一个维度处理，最后输出规范化好的stu_reg_fea
         if self.reused_teacher_head_idx != 0:
             reused_cls_feat = F.relu(reused_cls_feat)
             reused_reg_feat = F.relu(reused_reg_feat)
 
         module = self.teacher.bbox_head   #是走teacher_model
-        for i in range(self.reused_teacher_head_idx, module.stacked_convs):  #让
+        for i in range(self.reused_teacher_head_idx, module.stacked_convs):  #让stu_cls和stu_reg去走teacher_head的idx后面的层
             reused_cls_feat = module.cls_convs[i](reused_cls_feat)
             reused_reg_feat = module.reg_convs[i](reused_reg_feat)
         reused_cls_score = module.atss_cls(reused_cls_feat)
         reused_bbox_pred = scale(module.atss_reg(reused_reg_feat)).float()
         reused_centerness = module.atss_centerness(reused_reg_feat)
-        return reused_cls_score, reused_bbox_pred, reused_centerness   #怎么
+        return reused_cls_score, reused_bbox_pred, reused_centerness   
     
     def align_scale(self, stu_feat, tea_feat):
         N, C, H, W = stu_feat.size()
-        # normalize student feature，这个部分论文里没有提到
+        # normalize student feature，这个部分论文里没有提到，为什么要这么做，看着像是规范一下？
         stu_feat = stu_feat.permute(1, 0, 2, 3).reshape(C, -1)
         stu_mean = stu_feat.mean(dim=-1, keepdim=True)
         stu_std = stu_feat.std(dim=-1, keepdim=True)
@@ -134,15 +139,17 @@ class CrossKDATSS(CrossKDSingleStageDetector):
         return stu_feat.reshape(C, N, H, W).permute(1, 0, 2, 3)
     
     def loss_by_feat(
+            #应该就是经典的计算object detection蒸馏Loss的方法，调用的时候应该是两次，一个是T-S的Loss，一个是和GT的loss
             self,
             tea_cls_scores: List[Tensor],
             tea_bbox_preds: List[Tensor],
             tea_centernesses: List[Tensor],
-            tea_feats: List[Tensor],
+            tea_feats: List[Tensor],  
             cls_scores: List[Tensor],
             bbox_preds: List[Tensor],
             centernesses: List[Tensor],
             feats: List[Tensor],
+
             reused_cls_scores: List[Tensor],
             reused_bbox_preds: List[Tensor],
             reused_centernesses: List[Tensor],
@@ -225,7 +232,7 @@ class CrossKDATSS(CrossKDSingleStageDetector):
         
         if self.with_feat_distill:
             losses_feat_kd = [
-                self.loss_feat_kd(feat, tea_feat)
+                self.loss_feat_kd(feat, tea_feat)  #用的PKDloss
                 for feat, tea_feat in zip(feats, tea_feats)
             ]
             losses.update(loss_feat_kd=losses_feat_kd)
