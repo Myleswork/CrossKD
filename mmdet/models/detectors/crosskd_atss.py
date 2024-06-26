@@ -80,12 +80,17 @@ class CrossKDATSS(CrossKDSingleStageDetector):
         return losses
     
     def forward_hkd_single(self, x, scale, module):
+        '''
+        Returns:
+        cls_score, bbox_pred, centerness: detection result of student model
+        cls_fea_hold, reg_fea_hold: feature of idx layer output and wait to be send to teacher head, in paper best layer is 2
+        '''
         cls_feat, reg_feat = x, x
         cls_feat_hold, reg_feat_hold = x, x
         for i, cls_conv in enumerate(module.bbox_head.cls_convs):
-            cls_feat = cls_conv(cls_feat, activate=False)
+            cls_feat = cls_conv(cls_feat, activate=False)  #对出来的cls_fea用cls_conv做一次处理，理论上应该是做两次处理
             if i + 1 == self.reused_teacher_head_idx:
-                cls_feat_hold = cls_feat
+                cls_feat_hold = cls_feat    #这里是经过多少次处理然后把特征取出来，过一遍教师网络的意思么？
             cls_feat = cls_conv.activate(cls_feat)
         for i, reg_conv in enumerate(module.bbox_head.reg_convs):
             reg_feat = reg_conv(reg_feat, activate=False)
@@ -95,12 +100,12 @@ class CrossKDATSS(CrossKDSingleStageDetector):
         cls_score = module.bbox_head.atss_cls(cls_feat)
         bbox_pred = scale(module.bbox_head.atss_reg(reg_feat)).float()
         centerness = module.bbox_head.atss_centerness(reg_feat)
-        return cls_score, bbox_pred, centerness, cls_feat_hold, reg_feat_hold
+        return cls_score, bbox_pred, centerness, cls_feat_hold, reg_feat_hold  
     
     def reuse_teacher_head(self, tea_cls_feat, tea_reg_feat, stu_cls_feat,
                            stu_reg_feat, scale):
-        reused_cls_feat = self.align_scale(stu_cls_feat, tea_cls_feat)
-        reused_reg_feat = self.align_scale(stu_reg_feat, tea_reg_feat)
+        reused_cls_feat = self.align_scale(stu_cls_feat, tea_cls_feat)  #做一个维度处理
+        reused_reg_feat = self.align_scale(stu_reg_feat, tea_reg_feat)  #做一个维度处理
         if self.reused_teacher_head_idx != 0:
             reused_cls_feat = F.relu(reused_cls_feat)
             reused_reg_feat = F.relu(reused_reg_feat)
@@ -120,7 +125,7 @@ class CrossKDATSS(CrossKDSingleStageDetector):
         stu_feat = stu_feat.permute(1, 0, 2, 3).reshape(C, -1)
         stu_mean = stu_feat.mean(dim=-1, keepdim=True)
         stu_std = stu_feat.std(dim=-1, keepdim=True)
-        stu_feat = (stu_feat - stu_mean) / (stu_std + 1e-6)
+        stu_feat = (stu_feat - stu_mean) / (stu_std + 1e-6)  #做一个处理
         #
         tea_feat = tea_feat.permute(1, 0, 2, 3).reshape(C, -1)
         tea_mean = tea_feat.mean(dim=-1, keepdim=True)
