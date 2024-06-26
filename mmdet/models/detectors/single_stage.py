@@ -129,7 +129,7 @@ class SingleStageDetector(BaseDetector):
         Returns:
             tuple[list]: A tuple of features from ``bbox_head`` forward.
         """
-        x = self.extract_feat(batch_inputs)
+        x = self.extract_feat(batch_inputs)  #就是backbone提取出来的特征
         results = self.bbox_head.forward(x)
         return results
 
