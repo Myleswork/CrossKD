@@ -110,22 +110,22 @@ class CrossKDATSS(CrossKDSingleStageDetector):
             reused_cls_feat = F.relu(reused_cls_feat)
             reused_reg_feat = F.relu(reused_reg_feat)
 
-        module = self.teacher.bbox_head
-        for i in range(self.reused_teacher_head_idx, module.stacked_convs):
+        module = self.teacher.bbox_head   #是走teacher_model
+        for i in range(self.reused_teacher_head_idx, module.stacked_convs):  #让
             reused_cls_feat = module.cls_convs[i](reused_cls_feat)
             reused_reg_feat = module.reg_convs[i](reused_reg_feat)
         reused_cls_score = module.atss_cls(reused_cls_feat)
         reused_bbox_pred = scale(module.atss_reg(reused_reg_feat)).float()
         reused_centerness = module.atss_centerness(reused_reg_feat)
-        return reused_cls_score, reused_bbox_pred, reused_centerness
+        return reused_cls_score, reused_bbox_pred, reused_centerness   #怎么
     
     def align_scale(self, stu_feat, tea_feat):
         N, C, H, W = stu_feat.size()
-        # normalize student feature
+        # normalize student feature，这个部分论文里没有提到
         stu_feat = stu_feat.permute(1, 0, 2, 3).reshape(C, -1)
         stu_mean = stu_feat.mean(dim=-1, keepdim=True)
         stu_std = stu_feat.std(dim=-1, keepdim=True)
-        stu_feat = (stu_feat - stu_mean) / (stu_std + 1e-6)  #做一个处理
+        stu_feat = (stu_feat - stu_mean) / (stu_std + 1e-6)  
         #
         tea_feat = tea_feat.permute(1, 0, 2, 3).reshape(C, -1)
         tea_mean = tea_feat.mean(dim=-1, keepdim=True)
