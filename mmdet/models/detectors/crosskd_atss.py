@@ -250,6 +250,7 @@ class CrossKDATSS(CrossKDSingleStageDetector):
                                    reused_centernesses,
                                    label_weights, 
                                    avg_factor):
+        # 计算最后的Loss
         # classification branch distillation
         tea_cls_score = tea_cls_score.permute(0, 2, 3, 1).reshape(-1, self.bbox_head.cls_out_channels)
         reused_cls_score = reused_cls_score.permute(0, 2, 3, 1).reshape(-1, self.bbox_head.cls_out_channels)

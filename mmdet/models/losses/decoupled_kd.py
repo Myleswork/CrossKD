@@ -34,7 +34,7 @@ class DKDLoss(nn.Module):
         self,
         tau: float = 1.0,
         alpha: float = 1.0,
-        beta: float = 1.0,
+        beta: float = 1.0,  
         reduction: str = 'batchmean',
         loss_weight: float = 1.0,
     ) -> None:
@@ -65,7 +65,7 @@ class DKDLoss(nn.Module):
         Return:
             torch.Tensor: The calculated loss value.
         """
-        gt_mask = self._get_gt_mask(preds_S, gt_labels)
+        gt_mask = self._get_gt_mask(preds_S, gt_labels)  #其实就应该是b^T和b^S
         tckd_loss = self._get_tckd_loss(preds_S, preds_T, gt_labels, gt_mask)
         nckd_loss = self._get_nckd_loss(preds_S, preds_T, gt_mask)
         loss = self.alpha * tckd_loss + self.beta * nckd_loss
@@ -78,11 +78,11 @@ class DKDLoss(nn.Module):
         gt_mask: torch.Tensor,
     ) -> torch.Tensor:
         """Calculate non-target class knowledge distillation."""
-        # implementation to mask out gt_mask, faster than index
-        s_nckd = F.log_softmax(preds_S / self.tau - 1000.0 * gt_mask, dim=1)
+        # implementation to mask out gt_mask, faster than index(可能比单独去掉目标类的概率要快？)
+        s_nckd = F.log_softmax(preds_S / self.tau - 1000.0 * gt_mask, dim=1)  #这是什么一次
         t_nckd = F.softmax(preds_T / self.tau - 1000.0 * gt_mask, dim=1)
         return self._kl_loss(s_nckd, t_nckd)
-
+ 
     def _get_tckd_loss(
         self,
         preds_S: torch.Tensor,
@@ -94,7 +94,7 @@ class DKDLoss(nn.Module):
         non_gt_mask = self._get_non_gt_mask(preds_S, gt_labels)
         s_tckd = F.softmax(preds_S / self.tau, dim=1)
         t_tckd = F.softmax(preds_T / self.tau, dim=1)
-        mask_student = torch.log(self._cat_mask(s_tckd, gt_mask, non_gt_mask))
+        mask_student = torch.log(self._cat_mask(s_tckd, gt_mask, non_gt_mask))  #为什么这里要non_gt_mask
         mask_teacher = self._cat_mask(t_tckd, gt_mask, non_gt_mask)
         return self._kl_loss(mask_student, mask_teacher)
 
@@ -110,6 +110,7 @@ class DKDLoss(nn.Module):
         return kl_loss
 
     def _cat_mask(
+        #这里为什么直接用tckd来拼接呢？
         self,
         tckd: torch.Tensor,
         gt_mask: torch.Tensor,
@@ -125,6 +126,7 @@ class DKDLoss(nn.Module):
         logits: torch.Tensor,
         target: torch.Tensor,
     ) -> torch.Tensor:
+        #提取logits中目标类部分
         """Calculate groundtruth mask on logits with target class tensor.
 
         Args:
@@ -143,6 +145,7 @@ class DKDLoss(nn.Module):
         logits: torch.Tensor,
         target: torch.Tensor,
     ) -> torch.Tensor:
+        #提取logits中的非目标类部分
         """Calculate non-groundtruth mask on logits with target class tensor.
 
         Args:
